@@ -21,6 +21,7 @@ const createHttpsFunction = (httpsFunction) =>
 
 // helper functions
 const MESSAGE_QUEUE_SIZE = 15;
+const DEFAULT_NUM_OF_MESSAGES_TAKEN_FROM_QUEUE = 3;
 const messageQueue = admin.firestore().collection('message-queue');
 const chatMessages = admin.firestore().collection('chat-messages');
 
@@ -81,9 +82,13 @@ exports.sendMessage = createHttpsFunction(async (request, response) => {
   }
 });
 
-exports.broadcastMessageFromQueue = createHttpsFunction(async (request, response) => {
+exports.broadcastMessagesFromQueue = createHttpsFunction(async (request, response) => {
+  const numOfMessages = request.body.num_of_messages
+    ? request.body.num_of_messages
+    : DEFAULT_NUM_OF_MESSAGES_TAKEN_FROM_QUEUE;
+
   try {
-    const queuedMessages = await messageQueue.limit(3).get();
+    const queuedMessages = await messageQueue.limit(numOfMessages).get();
     if (!queuedMessages.size) {
       return;
     }
