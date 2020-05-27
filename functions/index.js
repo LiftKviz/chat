@@ -29,10 +29,13 @@ const createHttpsFunction = (httpsFunction) =>
 
 // helper functions
 const MESSAGE_QUEUE_SIZE = 15;
-const currentState = () => admin.firestore().collection('chat-data').doc('current-state');
-const messageQueue = () => admin.firestore().collection('message-queue');
-const chatMessages = () => admin.firestore().collection('chat-messages');
-const addMessage = (collection, data) => collection.doc(`${new Date().getTime()}`).set(data);
+const messageQueue = admin.firestore().collection('message-queue');
+const chatMessages = admin.firestore().collection('chat-messages');
+
+const queueMessage = (message, player) =>
+  messageQueue.doc(`${new Date().getTime()}`).set({ message, player });
+const addChatMessages = (messages) => chatMessages.doc(`${new Date().getTime()}`).set({ messages });
+
 const deleteAllDocumentsFromCollection = (collection) =>
   collection
     .select()
@@ -42,6 +45,9 @@ const deleteAllDocumentsFromCollection = (collection) =>
         doc.ref.delete();
       });
     });
+const hasPriority = (player) =>
+  player.has_priority_on_chat &&
+  (player.has_priority_on_chat === true || player.has_priority_on_chat == 1);
 
 // https functions
 exports.smokeTest = createHttpsFunction((request, response) => {
@@ -49,36 +55,33 @@ exports.smokeTest = createHttpsFunction((request, response) => {
 });
 
 exports.startChat = createHttpsFunction((request, response) => {
-  currentState().set({ isActive: true });
+  deleteAllDocumentsFromCollection(messageQueue);
+  deleteAllDocumentsFromCollection(chatMessages);
   response.send();
 });
 
 exports.endChat = createHttpsFunction((request, response) => {
-  currentState().set({ isActive: false });
-  deleteAllDocumentsFromCollection(messageQueue());
-  deleteAllDocumentsFromCollection(chatMessages());
+  deleteAllDocumentsFromCollection(messageQueue);
+  deleteAllDocumentsFromCollection(chatMessages);
 
   response.send();
 });
 
 exports.sendMessage = createHttpsFunction(async (request, response) => {
   try {
-    const currentStateDoc = await currentState().get();
-    if (!currentStateDoc.data().isActive) {
+    let { message, player } = request.body;
+    player = typeof player == 'string' ? JSON.parse(player) : player;
+    if (hasPriority(player)) {
+      addChatMessages(chatMessages, [{ message, player }]);
       return;
     }
 
-    if (request.body.player && request.body.player.has_priority_on_chat) {
-      addMessage(chatMessages(), request.body);
-      return;
-    }
-
-    const queuedMessages = await messageQueue().select().get();
+    const queuedMessages = await messageQueue.select().get();
     if (queuedMessages.size >= MESSAGE_QUEUE_SIZE) {
       return;
     }
 
-    addMessage(messageQueue(), request.body);
+    queueMessage(message, player);
   } catch (err) {
     console.log(err);
   } finally {
@@ -88,15 +91,17 @@ exports.sendMessage = createHttpsFunction(async (request, response) => {
 
 exports.broadcastMessageFromQueue = createHttpsFunction(async (request, response) => {
   try {
-    const queuedMessages = await messageQueue().limit(3).get();
+    const queuedMessages = await messageQueue.limit(3).get();
     if (!queuedMessages.size) {
       return;
     }
 
+    const newMessages = [];
     queuedMessages.docs.forEach((message) => {
-      addMessage(chatMessages(), message.data());
+      newMessages.push(message.data());
       message.ref.delete();
     });
+    addChatMessages(newMessages);
   } catch (err) {
     console.log(err);
   } finally {
