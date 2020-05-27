@@ -86,7 +86,7 @@ exports.broadcastMessagesFromQueue = createHttpsFunction(async (request, respons
   let numOfMessages = DEFAULT_NUM_OF_MESSAGES_TAKEN_FROM_QUEUE;
   try {
     numOfMessages = parseInt(request.body.num_of_messages);
-  } catch {}
+  } catch (e) {}
 
   try {
     const queuedMessages = await messageQueue.limit(numOfMessages).get();
