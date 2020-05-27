@@ -10,15 +10,7 @@ const cors = require('cors')({
   ],
 });
 
-admin.initializeApp({
-  databaseURL: 'secret',
-  credential: admin.credential.cert({
-    projectId: 'secret',
-    clientEmail: 'secret',
-    privateKey:
-      'secret',
-  }),
-});
+admin.initializeApp();
 
 const createHttpsFunction = (httpsFunction) =>
   functions.region('europe-west3').https.onRequest((request, response) => {
