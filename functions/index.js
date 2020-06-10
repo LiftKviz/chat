@@ -23,7 +23,7 @@ const createHttpsFunction = (httpsFunction) =>
 const MESSAGE_QUEUE_SIZE = 15;
 const DEFAULT_NUM_OF_MESSAGES_TAKEN_FROM_QUEUE = 3;
 const messageQueue = admin.firestore().collection('message-queue');
-const chatMessages = admin.firestore().collection('chat-messages');
+const chatMessages = admin.firestore().collection('moderator-chat-messages');
 
 const queueMessage = (message, player) =>
   messageQueue.doc(`${new Date().getTime()}`).set({ message, player });
